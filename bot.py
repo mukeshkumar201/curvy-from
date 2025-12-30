@@ -11,49 +11,48 @@ def get_new_image():
     print(f"--- Step 1: Scraping Thumbnail from {PORN_SOURCE} ---")
     headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.5',
     }
     
     try:
         r = requests.get(PORN_SOURCE, headers=headers, timeout=30)
         print(f"DEBUG: Site Status Code: {r.status_code}")
         
-        if r.status_code != 200:
-            print("ERROR: Website ne access block kiya hai (Status Code 403/503).")
-            return None
-            
         soup = BeautifulSoup(r.text, 'html.parser')
         posted = open(HISTORY_FILE, "r").read().splitlines() if os.path.exists(HISTORY_FILE) else []
         
         valid_imgs = []
-        # Saare images dhundo
         all_imgs = soup.find_all('img')
         print(f"DEBUG: Total images found on page: {len(all_imgs)}")
 
         for img in all_imgs:
-            # Check for multiple possible source attributes (Lazy loading fix)
-            src = img.get('data-src') or img.get('src') or img.get('data-original') or img.get('data-lazy-src')
+            # Har possible attribute check karo jahan image link ho sakta hai
+            src = img.get('data-src') or img.get('src') or img.get('data-original') or img.get('data-lazy')
             
             if not src:
                 continue
-                
-            # Normalize URL
+            
+            # URL ko complete (absolute) karo
             if src.startswith('//'):
                 src = 'https:' + src
-            elif src.startswith('/'):
+            elif src.startswith('/') and not src.startswith('//'):
                 src = 'https://www.pornpics.com' + src
             
-            # Sirf PornPics ki real images uthao (Ads ya small icons filter karo)
-            if "pornpics.com" in src:
-                # 't' stands for thumbnail in PornPics
-                if "/t/" in src or "thumb" in src or "images." in src:
-                    if src not in posted:
-                        valid_imgs.append(src)
+            # Filter: Hum ads aur icons ko nikal rahe hain
+            # Thumbnail aksar 'pornpics.com' ke static servers par hoti hain
+            # Maine filter thoda wide kiya hai (sirf 'logo' aur 'icon' ko exclude kiya hai)
+            if "pornpics.com" in src and "logo" not in src.lower() and "icon" not in src.lower():
+                if src not in posted:
+                    valid_imgs.append(src)
+                else:
+                    # Agar aapko lag raha hai ki sab 'posted' dikha raha hai toh ye line debug karegi
+                    pass 
 
-        # Unique images filter
+        # Sirf pehle 3 images print karo debug ke liye
+        if all_imgs:
+            print(f"DEBUG Sample URLs found: {[img.get('src') for img in all_imgs[:3]]}")
+
         valid_imgs = list(set(valid_imgs))
-        print(f"DEBUG: Valid unique thumbnails found: {len(valid_imgs)}")
+        print(f"DEBUG: Valid unique thumbnails after filtering: {len(valid_imgs)}")
         
         if valid_imgs:
             img_url = random.choice(valid_imgs)
@@ -70,7 +69,7 @@ def get_new_image():
 
 def post_to_forum(p, direct_url):
     print("--- Step 2: Posting Direct URL to Forum ---")
-    browser = p.chromium.launch(headless=True, args=["--no-sandbox", "--disable-setuid-sandbox"])
+    browser = p.chromium.launch(headless=True, args=["--no-sandbox"])
     context = browser.new_context(user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
     
     cookies_raw = os.environ.get('EX_COOKIES')
@@ -83,9 +82,8 @@ def post_to_forum(p, direct_url):
     
     try:
         print(f"Opening thread...")
-        page.goto(THREAD_REPLY_URL, wait_until="domcontentloaded", timeout=60000)
+        page.goto(THREAD_REPLY_URL, wait_until="networkidle", timeout=60000)
         
-        # Editor wait logic
         editor = page.locator('.fr-element').first
         editor.wait_for(state="visible", timeout=30000)
         
@@ -97,20 +95,14 @@ def post_to_forum(p, direct_url):
         # Image Insert
         print("Inserting image via URL...")
         page.click('#insertImage-1', force=True)
-        time.sleep(1)
+        time.sleep(2)
         
-        # Click 'By URL' tab if available
-        by_url = page.locator('button[data-cmd="imageByURL"]').first
-        if by_url.is_visible():
-            by_url.click()
-            time.sleep(1)
-
-        url_input = page.locator('input[name="src"]').first
+        # URL input ko target karna
+        url_input = page.locator('input[name="src"], .fr-link-input').first
         url_input.fill(direct_url)
         page.keyboard.press("Enter")
         
-        # Wait for image to load in editor
-        time.sleep(10) 
+        time.sleep(10) # Wait for image load
 
         # --- BOTTOM TEXT ---
         page.keyboard.press("Control+End")
@@ -122,7 +114,7 @@ def post_to_forum(p, direct_url):
         submit_btn = page.locator('button:has-text("Post reply")').first
         submit_btn.click()
         
-        print("--- POST SUBMITTED ---")
+        print("--- BOT TASK FINISHED SUCCESSFULLY ---")
         time.sleep(5)
         
     except Exception as e:
@@ -136,4 +128,4 @@ if __name__ == "__main__":
         if img_url:
             post_to_forum(playwright, img_url)
         else:
-            print("No new image found. Check Debug logs above.")
+            print("No new image found. Filtering logic check required.")
