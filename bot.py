@@ -7,7 +7,7 @@ HISTORY_FILE = "posted_urls.txt"
 # Source: Indian Pussy Tag
 PORN_SOURCE = "https://www.pornpics.com/tags/pussy-fuck/"
 # Target: Desi Pussy Collection Thread
-THREAD_REPLY_URL = "https://exforum.live/threads/curvy-porn-pic-collection.203446/reply"
+THREAD_REPLY_URL = "https://exforum.live/threads/indian-pussy-collection.203454/reply"
 
 def get_new_image():
     print(f"--- Step 1: Scraping Direct Link from {PORN_SOURCE} ---")
