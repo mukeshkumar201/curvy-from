@@ -2,7 +2,7 @@ name: Hourly GIF Poster
 
 on:
   schedule:
-    - cron: '*/20 * * * *' # Har 20 minute mein chalega
+    - cron: '*/50 * * * *' # Har 20 minute mein chalega
   push:
     branches:
       - main           # Code save karte hi run hoga
