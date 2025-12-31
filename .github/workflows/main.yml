@@ -1,9 +1,11 @@
-name: Curvy Mom  # Naam change kar diya (small 'n' ke sath)
+name: Hourly Poster image
 
 on:
   schedule:
-    # 20 min ka gap, lekin odd time (3, 23, 43) taaki baaki bots se na takraye
-    - cron: '3,23,43 * * * *'
+    # Line 1: Har 3 ghante mein minute 03 par (00:03, 03:03, 06:03...)
+    - cron: '3 0,3,6,9,12,15,18,21 * * *'
+    # Line 2: Har 3 ghante mein minute 33 par (01:33, 04:33, 07:33...)
+    - cron: '33 1,4,7,10,13,16,19,22 * * *'
   push:
     branches:
       - main
@@ -44,11 +46,9 @@ jobs:
           git config --local user.name "GitHub Action"
           git pull origin main --rebase || echo "Rebase not needed"
           
-          # Dhyan rahe: bot.py jo file bana raha hai wahi yahan honi chahiye
-          # Agar script 'posted_gifs.txt' use kar rahi hai toh yahi rehne dein
+          # IMPORTANT: bot.py mein jo history file hai, wahi yahan touch karni hai
           touch posted_gifs.txt
           git add posted_gifs.txt
           
           git commit -m "Update Curvy Mom history [skip ci]" || echo "No changes"
           git push origin main
-
