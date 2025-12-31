@@ -1,12 +1,13 @@
-name: Hourly GIF Poster
+name: Curvy Mom  # Naam change kar diya (small 'n' ke sath)
 
 on:
   schedule:
-    - cron: '*/50 * * * *' # Har 20 minute mein chalega
+    # 20 min ka gap, lekin odd time (3, 23, 43) taaki baaki bots se na takraye
+    - cron: '3,23,43 * * * *'
   push:
     branches:
-      - main           # Code save karte hi run hoga
-  workflow_dispatch:   # Manual button se run karne ke liye
+      - main
+  workflow_dispatch:
 
 jobs:
   run-bot:
@@ -25,10 +26,8 @@ jobs:
       - name: Install dependencies
         run: |
           pip install -r requirements.txt
-          # GIF Watermark ke liye system fonts zaruri hain
           sudo apt-get update
           sudo apt-get install -y fonts-dejavu-core
-          # Playwright aur uske browsers install karein
           python -m playwright install chromium --with-deps
 
       - name: Run Bot
@@ -43,8 +42,13 @@ jobs:
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          git pull origin main || echo "Nothing to pull"
+          git pull origin main --rebase || echo "Rebase not needed"
+          
+          # Dhyan rahe: bot.py jo file bana raha hai wahi yahan honi chahiye
+          # Agar script 'posted_gifs.txt' use kar rahi hai toh yahi rehne dein
           touch posted_gifs.txt
           git add posted_gifs.txt
-          git commit -m "Update GIF history [skip ci]" || echo "No changes"
-          git push origin main || echo "No changes"
+          
+          git commit -m "Update Curvy Mom history [skip ci]" || echo "No changes"
+          git push origin main
+
