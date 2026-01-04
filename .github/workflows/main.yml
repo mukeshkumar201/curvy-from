@@ -35,8 +35,14 @@ jobs:
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          git pull origin main --rebase
+          
+          # 1. Pehle changes commit karo
           touch posted_urls.txt
           git add posted_urls.txt
-          git commit -m "Update history ***skip ci***" || echo "No changes"
+          git commit -m "Update history ***skip ci***" || echo "No changes to commit"
+          
+          # 2. Phir pull karo (Conflict nahi hoga)
+          git pull origin main --rebase
+          
+          # 3. Phir push karo
           git push origin main
