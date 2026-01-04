@@ -2,8 +2,9 @@ name: Hourly Poster image
 
 on:
   schedule:
+    # Ye har ghante automatic chalega
     - cron: '0 * * * *'
-  workflow_dispatch:
+  workflow_dispatch: # Taaki tum manually bhi jab chaho chala sako
 
 permissions:
   contents: write
@@ -23,11 +24,14 @@ jobs:
       - name: Install Dependencies
         run: |
           pip install requests beautifulsoup4 playwright Pillow
-          playwright install chromium
+          # Playwright ke liye zaroori system libraries install karega
+          playwright install chromium --with-deps
 
       - name: Run Bot
         env:
-          EX_COOKIES: ${{ secrets.EX_COOKIES }}
+          # GitHub Secrets se values uthayega
+          EX_USER: ${{ secrets.EX_USER }}
+          EX_PASS: ${{ secrets.EX_PASS }}
           IMGBB_API_KEY: ${{ secrets.IMGBB_API_KEY }}
         run: python bot.py
 
@@ -35,8 +39,14 @@ jobs:
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
+          
+          # Pehle remote changes le lo taaki conflict na ho
+          git pull origin main --rebase || echo "No rebase needed"
+          
+          # History file update karo (taaki same image repeat na ho)
           touch posted_urls.txt
           git add posted_urls.txt
-          git commit -m "Update history ***skip ci***" || echo "No changes"
-          git pull origin main --rebase
+          
+          # Commit aur Push (skip ci taaki loop na bane)
+          git commit -m "Update history ***skip ci***" || echo "No changes to commit"
           git push origin main
