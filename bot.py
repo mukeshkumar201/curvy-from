@@ -13,7 +13,6 @@ IMGBB_API_KEY = os.environ.get('IMGBB_API_KEY')
 EX_COOKIES = os.environ.get('EX_COOKIES')
 
 def add_watermark(image_bytes):
-    """Image par watermark add karega"""
     try:
         img = Image.open(io.BytesIO(image_bytes))
         if img.mode != 'RGB': img = img.convert('RGB')
@@ -21,7 +20,7 @@ def add_watermark(image_bytes):
         width, height = img.size
         font_size = int(width * 0.05)
         try:
-            # GitHub Actions Linux font path
+            # GitHub Actions runner Linux font path
             font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", font_size)
         except:
             font = ImageFont.load_default()
@@ -37,7 +36,6 @@ def add_watermark(image_bytes):
         print(f"Watermark Error: {e}"); return None
 
 def upload_to_imgbb(img_bytes):
-    """ImgBB API v1 upload"""
     if not IMGBB_API_KEY:
         print("CRITICAL: IMGBB_API_KEY missing!")
         return None
@@ -56,7 +54,6 @@ def upload_to_imgbb(img_bytes):
         print(f"ImgBB Error: {e}"); return None
 
 def get_processed_image():
-    """Scraping and processing"""
     print(f"--- Step 1: Scraping from {PORN_SOURCE} ---")
     headers = {'User-Agent': 'Mozilla/5.0'}
     try:
@@ -88,9 +85,9 @@ def get_processed_image():
     except Exception as e: print(f"Scrape Error: {e}"); return None
 
 def post_to_forum(p, hosted_url):
-    """Cookies use karke forum par post karega"""
     print("--- Step 4: Posting to Forum ---")
     browser = p.chromium.launch(headless=True, args=["--no-sandbox"])
+    # Real user-agent taaki forum ko shak na ho
     context = browser.new_context(user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
     
     try:
@@ -103,7 +100,7 @@ def post_to_forum(p, hosted_url):
     page = context.new_page()
     try:
         page.goto(THREAD_REPLY_URL, wait_until="domcontentloaded", timeout=60000)
-        time.sleep(5) # Page stabilize hone ke liye
+        time.sleep(5) 
 
         # Login Check: 'Log out' link dhund raha hai
         if page.locator('a[href*="logout"]').count() == 0:
