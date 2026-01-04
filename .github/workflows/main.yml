@@ -2,11 +2,17 @@ name: Hourly Poster image
 
 on:
   schedule:
+    # Ye har ghante 0th minute par automatic chalega
     - cron: '0 * * * *'
-  workflow_dispatch:
+  workflow_dispatch: # Taaki tum manually bhi chala sako
 
 permissions:
   contents: write
+
+# Taaki do jobs ek sath na chalein aur history conflict na ho
+concurrency:
+  group: forum-poster
+  cancel-in-progress: false
 
 jobs:
   run-bot:
@@ -23,7 +29,8 @@ jobs:
       - name: Install Dependencies
         run: |
           pip install requests beautifulsoup4 playwright Pillow
-          playwright install chromium
+          # Browser ke sath zaroori Linux libraries bhi install karega
+          playwright install chromium --with-deps
 
       - name: Run Bot
         env:
@@ -36,13 +43,13 @@ jobs:
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
           
-          # 1. Pehle changes commit karo
+          # Pehle remote changes le lo taaki conflict na ho
+          git pull origin main --rebase || echo "No rebase needed"
+          
+          # Ab apni history file update karo
           touch posted_urls.txt
           git add posted_urls.txt
+          
+          # Commit aur Push (skip ci taaki loop na bane)
           git commit -m "Update history ***skip ci***" || echo "No changes to commit"
-          
-          # 2. Phir pull karo (Conflict nahi hoga)
-          git pull origin main --rebase
-          
-          # 3. Phir push karo
           git push origin main
