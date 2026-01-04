@@ -7,12 +7,9 @@ from PIL import Image, ImageDraw, ImageFont
 HISTORY_FILE = "posted_urls.txt"
 PORN_SOURCE = "https://www.pornpics.com/tags/pussy-fuck/"
 THREAD_REPLY_URL = "https://exforum.live/threads/fucking-pussy-collection.203456/reply"
-LOGIN_URL = "https://exforum.live/login/"
 
-# GitHub Secrets
 IMGBB_API_KEY = os.environ.get('IMGBB_API_KEY')
-EX_USER = os.environ.get('EX_USER')
-EX_PASS = os.environ.get('EX_PASS')
+EX_COOKIES = os.environ.get('EX_COOKIES')
 
 def add_watermark(image_bytes):
     try:
@@ -43,12 +40,14 @@ def upload_to_imgbb(img_bytes):
         r = requests.post(api_url, data=payload, files=files)
         res = r.json()
         if res.get("status") == 200:
-            return res["data"]["url"]
+            link = res["data"]["url"]
+            print(f"SUCCESS: ImgBB Link -> {link}")
+            return link
         return None
     except: return None
 
 def get_processed_image():
-    print(f"--- Step 1: Scraping ---")
+    print("--- Step 1: Scraping ---")
     headers = {'User-Agent': 'Mozilla/5.0'}
     try:
         r = requests.get(PORN_SOURCE, headers=headers)
@@ -67,6 +66,7 @@ def get_processed_image():
         new_imgs = [u if u.startswith('http') else "https:" + u for u in valid_imgs if u not in posted]
         if new_imgs:
             sel = random.choice(new_imgs)
+            print(f"Processing Image: {sel}")
             raw = requests.get(sel).content
             marked = add_watermark(raw)
             if marked:
@@ -78,26 +78,25 @@ def get_processed_image():
     except: return None
 
 def post_to_forum(p, hosted_url):
-    print("--- Step 4: Posting (Auto-Login Mode) ---")
-    browser = p.chromium.launch(headless=True, args=["--no-sandbox"])
+    print("--- Step 4: Posting with Cookies ---")
+    browser = p.chromium.launch(headless=True)
+    # Aapka actual browser user-agent
     context = browser.new_context(user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
-    page = context.new_page()
     
     try:
-        # 1. Login Process
-        page.goto(LOGIN_URL, wait_until="networkidle")
-        page.fill('input[name="login"]', EX_USER)
-        page.fill('input[name="password"]', EX_PASS)
-        page.click('button:has-text("Log in")')
-        page.wait_for_load_state("networkidle")
-        time.sleep(5)
+        cookies_list = json.loads(EX_COOKIES)
+        context.add_cookies(cookies_list)
+    except Exception as e:
+        print(f"Cookie Error: {e}")
+        return
 
-        # 2. Thread par jao
-        page.goto(THREAD_REPLY_URL, wait_until="networkidle")
+    page = context.new_page()
+    try:
+        page.goto(THREAD_REPLY_URL, wait_until="networkidle", timeout=60000)
         
-        # Check login: Log out link hai ya nahi
+        # Check login
         if page.locator('a[href*="logout"]').count() == 0:
-            print("CRITICAL: Login Failed! Check Username/Password.")
+            print("CRITICAL: Cookies Expired! Update EX_COOKIES Secret.")
             return
 
         editor = page.locator('.fr-element').first
@@ -107,7 +106,7 @@ def post_to_forum(p, hosted_url):
         time.sleep(3)
         
         page.locator('button:has-text("Post reply"), .button--icon--reply').first.click()
-        page.wait_for_timeout(5000)
+        page.wait_for_timeout(10000)
         print("--- SUCCESS: IMAGE POSTED ---")
     except Exception as e:
         print(f"Error: {e}")
