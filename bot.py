@@ -42,7 +42,7 @@ def upload_to_freeimage(img_bytes):
         r = requests.post(api_url, data=payload, files=files)
         res = r.json()
         if res.get("status_code") == 200:
-            return res["image"]["url"] # Ye 'Direct Link' deta hai
+            return res["image"]["url"]
         return None
     except: return None
 
@@ -67,6 +67,7 @@ def get_processed_image():
         new_imgs = [u if u.startswith('http') else "https:" + u for u in valid_imgs if u not in posted]
         if new_imgs:
             sel = random.choice(new_imgs)
+            print(f"Processing Image: {sel}")
             raw = requests.get(sel).content
             marked = add_watermark(raw)
             final = upload_to_freeimage(marked)
@@ -86,15 +87,14 @@ def post_to_forum(p, hosted_url):
     try:
         page.goto(THREAD_REPLY_URL, wait_until="domcontentloaded", timeout=60000)
         
-        # Check Login
-        if not page.locator('a[href*="logout"]').first.is_attached():
+        # Fixed Login Check
+        if page.locator('a[href*="logout"]').count() == 0:
             print("CRITICAL: Login Failed! Check Cookies.")
             return
 
         editor = page.locator('.fr-element').first
         editor.wait_for(state="visible", timeout=30000)
         
-        # Post image as BBCode
         editor.focus()
         page.keyboard.type(f"[IMG]{hosted_url}[/IMG]")
         time.sleep(3)
