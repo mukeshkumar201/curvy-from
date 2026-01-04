@@ -8,7 +8,6 @@ HISTORY_FILE = "posted_urls.txt"
 PORN_SOURCE = "https://www.pornpics.com/tags/pussy-fuck/"
 THREAD_REPLY_URL = "https://exforum.live/threads/fucking-pussy-collection.203456/reply"
 
-# GitHub Secrets
 IMGBB_API_KEY = os.environ.get('IMGBB_API_KEY')
 EX_COOKIES = os.environ.get('EX_COOKIES')
 
@@ -20,7 +19,6 @@ def add_watermark(image_bytes):
         width, height = img.size
         font_size = int(width * 0.05)
         try:
-            # Linux font path for GitHub Actions
             font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", font_size)
         except:
             font = ImageFont.load_default()
@@ -32,13 +30,9 @@ def add_watermark(image_bytes):
         img_io = io.BytesIO()
         img.save(img_io, format='JPEG', quality=95)
         return img_io.getvalue()
-    except Exception as e:
-        print(f"ERROR (Watermark): {e}"); return None
+    except: return None
 
 def upload_to_imgbb(img_bytes):
-    if not IMGBB_API_KEY:
-        print("ERROR: IMGBB_API_KEY Secret missing!")
-        return None
     api_url = "https://api.imgbb.com/1/upload"
     payload = {"key": IMGBB_API_KEY, "expiration": "0"}
     files = {"image": ("image.jpg", img_bytes, "image/jpeg")}
@@ -49,15 +43,12 @@ def upload_to_imgbb(img_bytes):
             link = res["data"]["url"]
             print(f"SUCCESS: ImgBB Link -> {link}")
             return link
-        else:
-            print(f"ERROR (ImgBB Response): {res}")
-            return None
-    except Exception as e:
-        print(f"ERROR (ImgBB Connection): {e}"); return None
+        return None
+    except: return None
 
 def get_processed_image():
     print("--- Step 1: Scraping and Processing ---")
-    headers = {'User-Agent': 'Mozilla/5.0'}
+    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
     try:
         r = requests.get(PORN_SOURCE, headers=headers)
         soup = BeautifulSoup(r.text, 'html.parser')
@@ -65,7 +56,6 @@ def get_processed_image():
         target = random.choice(gal_links)
         if not target.startswith('http'): target = "https://www.pornpics.com" + target
         
-        print(f"Scraping Gallery: {target}")
         r_gal = requests.get(target, headers=headers)
         gal_soup = BeautifulSoup(r_gal.text, 'html.parser')
         posted = open(HISTORY_FILE, "r").read().splitlines() if os.path.exists(HISTORY_FILE) else []
@@ -84,30 +74,33 @@ def get_processed_image():
                 if final:
                     with open(HISTORY_FILE, "a") as f: f.write(sel + "\n")
                     return final
-        else:
-            print("No new images found.")
         return None
-    except Exception as e:
-        print(f"ERROR (Scraper): {e}"); return None
+    except: return None
 
 def post_to_forum(p, hosted_url):
     print("--- Step 4: Posting to Forum ---")
+    # Chrome jaisa behavior set kiya hai
     browser = p.chromium.launch(headless=True)
-    context = browser.new_context(user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+    context = browser.new_context(
+        user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        viewport={'width': 1280, 'height': 720}
+    )
     
     try:
         cookies_list = json.loads(EX_COOKIES)
         context.add_cookies(cookies_list)
-    except Exception as e:
-        print(f"ERROR (Cookie Load): {e}"); return
+    except:
+        print("CRITICAL: Cookie JSON format error."); return
 
     page = context.new_page()
     try:
-        page.goto(THREAD_REPLY_URL, wait_until="domcontentloaded", timeout=60000)
+        page.goto(THREAD_REPLY_URL, wait_until="networkidle", timeout=60000)
         time.sleep(5)
         
-        if page.locator('a[href*="logout"]').count() == 0:
-            print(f"CRITICAL: Login Check Failed. Current Page: {page.url}")
+        # New Login Check: Agar 'Log in' button dikh raha hai, toh login nahi hua
+        is_login_button = page.locator('a:has-text("Log in"), span:has-text("Log in")').first
+        if is_login_button.is_visible():
+            print(f"CRITICAL: Login Failed. Redirected to: {page.url}")
             return
 
         editor = page.locator('.fr-element').first
@@ -116,11 +109,12 @@ def post_to_forum(p, hosted_url):
         page.keyboard.type(f"[IMG]{hosted_url}[/IMG]")
         time.sleep(3)
         
+        # Click Reply
         page.locator('button:has-text("Post reply"), .button--icon--reply').first.click()
         page.wait_for_timeout(10000)
         print("--- SUCCESS: IMAGE POSTED ---")
     except Exception as e:
-        print(f"ERROR (Posting): {e}")
+        print(f"Forum Error: {e}")
     finally:
         browser.close()
 
@@ -129,5 +123,3 @@ if __name__ == "__main__":
         link = get_processed_image()
         if link:
             post_to_forum(playwright, link)
-        else:
-            print("Bot Stopped: No image link generated.")
