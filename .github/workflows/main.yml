@@ -36,7 +36,12 @@ jobs:
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
+          
+          # Git pull error fix
+          git stash || echo "No changes to stash"
           git pull origin main --rebase || echo "No rebase needed"
+          git stash pop || echo "Nothing to pop"
+          
           touch posted_urls.txt
           git add posted_urls.txt
           git commit -m "Update history ***skip ci***" || echo "No changes"
