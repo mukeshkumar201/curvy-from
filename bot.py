@@ -50,7 +50,7 @@ def upload_to_freeimage(img_bytes):
 
 def get_processed_image():
     print(f"--- Step 1: Scraping from {PORN_SOURCE} ---")
-    headers = {'User-Agent': 'Mozilla/5.0'}
+    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
     try:
         r = requests.get(PORN_SOURCE, headers=headers)
         soup = BeautifulSoup(r.text, 'html.parser')
@@ -82,7 +82,8 @@ def get_processed_image():
 def post_to_forum(p, hosted_url):
     print("--- Step 4: Posting to Forum ---")
     browser = p.chromium.launch(headless=True, args=["--no-sandbox"])
-    context = browser.new_context(user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+    # Browser user-agent ko normal rakha hai
+    context = browser.new_context(user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
     
     try:
         cookies_list = json.loads(EX_COOKIES)
@@ -94,11 +95,12 @@ def post_to_forum(p, hosted_url):
     page = context.new_page()
     try:
         page.goto(THREAD_REPLY_URL, wait_until="domcontentloaded", timeout=60000)
-        
-        # Login Check
-        time.sleep(5)
-        if page.locator('a[href*="logout"]').count() == 0:
-            print("CRITICAL: Login Failed! Check Cookies.")
+        time.sleep(5) # Page ko stabilize hone do
+
+        # Advanced Login Check: 'Log out' ya 'Your account' check karo
+        is_logged_in = page.locator('a:has-text("Log out"), .p-navgroup-link--user').count()
+        if is_logged_in == 0:
+            print(f"CRITICAL: Login Failed! URL: {page.url}")
             return
 
         editor = page.locator('.fr-element').first
@@ -111,8 +113,10 @@ def post_to_forum(p, hosted_url):
         page.locator('button:has-text("Post reply"), .button--icon--reply').first.click()
         page.wait_for_timeout(5000)
         print("--- SUCCESS: IMAGE POSTED ---")
-    except Exception as e: print(f"Forum Error: {e}")
-    finally: browser.close()
+    except Exception as e: 
+        print(f"Forum Error: {e}")
+    finally: 
+        browser.close()
 
 if __name__ == "__main__":
     with sync_playwright() as playwright:
