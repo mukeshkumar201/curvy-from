@@ -8,11 +8,11 @@ HISTORY_FILE = "posted_urls.txt"
 PORN_SOURCE = "https://www.pornpics.com/tags/pussy-fuck/"
 THREAD_REPLY_URL = "https://exforum.live/threads/fucking-pussy-collection.203456/reply"
 
+# GitHub Secrets
 IMGBB_API_KEY = os.environ.get('IMGBB_API_KEY')
 EX_COOKIES = os.environ.get('EX_COOKIES')
 
 def add_watermark(image_bytes):
-    print("DEBUG: Watermark process started...")
     try:
         img = Image.open(io.BytesIO(image_bytes))
         if img.mode != 'RGB': img = img.convert('RGB')
@@ -20,6 +20,7 @@ def add_watermark(image_bytes):
         width, height = img.size
         font_size = int(width * 0.05)
         try:
+            # Linux font path for GitHub Actions
             font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", font_size)
         except:
             font = ImageFont.load_default()
@@ -30,13 +31,14 @@ def add_watermark(image_bytes):
         draw.text((x, y), text, font=font, fill="white")
         img_io = io.BytesIO()
         img.save(img_io, format='JPEG', quality=95)
-        print("DEBUG: Watermark applied successfully.")
         return img_io.getvalue()
     except Exception as e:
-        print(f"DEBUG ERROR: Watermark Failed -> {e}"); return None
+        print(f"ERROR (Watermark): {e}"); return None
 
 def upload_to_imgbb(img_bytes):
-    print("DEBUG: ImgBB Upload started...")
+    if not IMGBB_API_KEY:
+        print("ERROR: IMGBB_API_KEY Secret missing!")
+        return None
     api_url = "https://api.imgbb.com/1/upload"
     payload = {"key": IMGBB_API_KEY, "expiration": "0"}
     files = {"image": ("image.jpg", img_bytes, "image/jpeg")}
@@ -45,15 +47,16 @@ def upload_to_imgbb(img_bytes):
         res = r.json()
         if res.get("status") == 200:
             link = res["data"]["url"]
-            print(f"DEBUG: ImgBB Success -> {link}")
+            print(f"SUCCESS: ImgBB Link -> {link}")
             return link
         else:
-            print(f"DEBUG ERROR: ImgBB Rejected -> {res}"); return None
+            print(f"ERROR (ImgBB Response): {res}")
+            return None
     except Exception as e:
-        print(f"DEBUG ERROR: ImgBB Exception -> {e}"); return None
+        print(f"ERROR (ImgBB Connection): {e}"); return None
 
 def get_processed_image():
-    print("--- Step 1: Scraping ---")
+    print("--- Step 1: Scraping and Processing ---")
     headers = {'User-Agent': 'Mozilla/5.0'}
     try:
         r = requests.get(PORN_SOURCE, headers=headers)
@@ -62,6 +65,7 @@ def get_processed_image():
         target = random.choice(gal_links)
         if not target.startswith('http'): target = "https://www.pornpics.com" + target
         
+        print(f"Scraping Gallery: {target}")
         r_gal = requests.get(target, headers=headers)
         gal_soup = BeautifulSoup(r_gal.text, 'html.parser')
         posted = open(HISTORY_FILE, "r").read().splitlines() if os.path.exists(HISTORY_FILE) else []
@@ -72,7 +76,7 @@ def get_processed_image():
         new_imgs = [u if u.startswith('http') else "https:" + u for u in valid_imgs if u not in posted]
         if new_imgs:
             sel = random.choice(new_imgs)
-            print(f"DEBUG: Selected Image -> {sel}")
+            print(f"Processing Image: {sel}")
             raw = requests.get(sel).content
             marked = add_watermark(raw)
             if marked:
@@ -80,13 +84,11 @@ def get_processed_image():
                 if final:
                     with open(HISTORY_FILE, "a") as f: f.write(sel + "\n")
                     return final
-            else:
-                print("DEBUG: Watermark function returned None.")
         else:
-            print("DEBUG: No new images found in this gallery.")
+            print("No new images found.")
         return None
     except Exception as e:
-        print(f"DEBUG ERROR: Scrape Failed -> {e}"); return None
+        print(f"ERROR (Scraper): {e}"); return None
 
 def post_to_forum(p, hosted_url):
     print("--- Step 4: Posting to Forum ---")
@@ -96,17 +98,16 @@ def post_to_forum(p, hosted_url):
     try:
         cookies_list = json.loads(EX_COOKIES)
         context.add_cookies(cookies_list)
-        print("DEBUG: Cookies injected successfully.")
     except Exception as e:
-        print(f"DEBUG ERROR: Cookie Load Failed -> {e}"); return
+        print(f"ERROR (Cookie Load): {e}"); return
 
     page = context.new_page()
     try:
-        page.goto(THREAD_REPLY_URL, wait_until="networkidle", timeout=60000)
+        page.goto(THREAD_REPLY_URL, wait_until="domcontentloaded", timeout=60000)
         time.sleep(5)
         
         if page.locator('a[href*="logout"]').count() == 0:
-            print(f"DEBUG ERROR: Login Check Failed! Current URL: {page.url}")
+            print(f"CRITICAL: Login Check Failed. Current Page: {page.url}")
             return
 
         editor = page.locator('.fr-element').first
@@ -119,15 +120,14 @@ def post_to_forum(p, hosted_url):
         page.wait_for_timeout(10000)
         print("--- SUCCESS: IMAGE POSTED ---")
     except Exception as e:
-        print(f"DEBUG ERROR: Posting failed -> {e}")
+        print(f"ERROR (Posting): {e}")
     finally:
         browser.close()
 
 if __name__ == "__main__":
     with sync_playwright() as playwright:
-        print("DEBUG: Bot execution started.")
         link = get_processed_image()
         if link:
             post_to_forum(playwright, link)
         else:
-            print("DEBUG: Bot stopped - No link generated from Step 1.")
+            print("Bot Stopped: No image link generated.")
