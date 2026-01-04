@@ -12,6 +12,7 @@ IMGBB_API_KEY = os.environ.get('IMGBB_API_KEY')
 EX_COOKIES = os.environ.get('EX_COOKIES')
 
 def add_watermark(image_bytes):
+    print("DEBUG: Watermark process started...")
     try:
         img = Image.open(io.BytesIO(image_bytes))
         if img.mode != 'RGB': img = img.convert('RGB')
@@ -29,10 +30,13 @@ def add_watermark(image_bytes):
         draw.text((x, y), text, font=font, fill="white")
         img_io = io.BytesIO()
         img.save(img_io, format='JPEG', quality=95)
+        print("DEBUG: Watermark applied successfully.")
         return img_io.getvalue()
-    except: return None
+    except Exception as e:
+        print(f"DEBUG ERROR: Watermark Failed -> {e}"); return None
 
 def upload_to_imgbb(img_bytes):
+    print("DEBUG: ImgBB Upload started...")
     api_url = "https://api.imgbb.com/1/upload"
     payload = {"key": IMGBB_API_KEY, "expiration": "0"}
     files = {"image": ("image.jpg", img_bytes, "image/jpeg")}
@@ -41,10 +45,12 @@ def upload_to_imgbb(img_bytes):
         res = r.json()
         if res.get("status") == 200:
             link = res["data"]["url"]
-            print(f"SUCCESS: ImgBB Link -> {link}")
+            print(f"DEBUG: ImgBB Success -> {link}")
             return link
-        return None
-    except: return None
+        else:
+            print(f"DEBUG ERROR: ImgBB Rejected -> {res}"); return None
+    except Exception as e:
+        print(f"DEBUG ERROR: ImgBB Exception -> {e}"); return None
 
 def get_processed_image():
     print("--- Step 1: Scraping ---")
@@ -66,7 +72,7 @@ def get_processed_image():
         new_imgs = [u if u.startswith('http') else "https:" + u for u in valid_imgs if u not in posted]
         if new_imgs:
             sel = random.choice(new_imgs)
-            print(f"Processing Image: {sel}")
+            print(f"DEBUG: Selected Image -> {sel}")
             raw = requests.get(sel).content
             marked = add_watermark(raw)
             if marked:
@@ -74,29 +80,33 @@ def get_processed_image():
                 if final:
                     with open(HISTORY_FILE, "a") as f: f.write(sel + "\n")
                     return final
+            else:
+                print("DEBUG: Watermark function returned None.")
+        else:
+            print("DEBUG: No new images found in this gallery.")
         return None
-    except: return None
+    except Exception as e:
+        print(f"DEBUG ERROR: Scrape Failed -> {e}"); return None
 
 def post_to_forum(p, hosted_url):
-    print("--- Step 4: Posting with Cookies ---")
+    print("--- Step 4: Posting to Forum ---")
     browser = p.chromium.launch(headless=True)
-    # Aapka actual browser user-agent
     context = browser.new_context(user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
     
     try:
         cookies_list = json.loads(EX_COOKIES)
         context.add_cookies(cookies_list)
+        print("DEBUG: Cookies injected successfully.")
     except Exception as e:
-        print(f"Cookie Error: {e}")
-        return
+        print(f"DEBUG ERROR: Cookie Load Failed -> {e}"); return
 
     page = context.new_page()
     try:
         page.goto(THREAD_REPLY_URL, wait_until="networkidle", timeout=60000)
+        time.sleep(5)
         
-        # Check login
         if page.locator('a[href*="logout"]').count() == 0:
-            print("CRITICAL: Cookies Expired! Update EX_COOKIES Secret.")
+            print(f"DEBUG ERROR: Login Check Failed! Current URL: {page.url}")
             return
 
         editor = page.locator('.fr-element').first
@@ -109,11 +119,15 @@ def post_to_forum(p, hosted_url):
         page.wait_for_timeout(10000)
         print("--- SUCCESS: IMAGE POSTED ---")
     except Exception as e:
-        print(f"Error: {e}")
+        print(f"DEBUG ERROR: Posting failed -> {e}")
     finally:
         browser.close()
 
 if __name__ == "__main__":
     with sync_playwright() as playwright:
+        print("DEBUG: Bot execution started.")
         link = get_processed_image()
-        if link: post_to_forum(playwright, link)
+        if link:
+            post_to_forum(playwright, link)
+        else:
+            print("DEBUG: Bot stopped - No link generated from Step 1.")
