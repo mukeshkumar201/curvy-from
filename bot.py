@@ -20,7 +20,7 @@ def add_watermark(image_bytes):
         width, height = img.size
         font_size = int(width * 0.05)
         try:
-            # GitHub Actions runner default path for Linux
+            # GitHub Actions runner default path for Linux fonts
             font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", font_size)
         except:
             font = ImageFont.load_default()
@@ -99,12 +99,11 @@ def post_to_forum(p, hosted_url):
         print("CRITICAL: EX_COOKIES secret is missing!")
         return
 
-    # Cookie Loading with Error Handling
     try:
         cookies_list = json.loads(EX_COOKIES)
         context.add_cookies(cookies_list)
     except Exception as e:
-        print(f"Cookie JSON Error: {e}. Check if square brackets [] are correct.")
+        print(f"Cookie JSON Error: {e}")
         return
 
     page = context.new_page()
@@ -134,4 +133,9 @@ def post_to_forum(p, hosted_url):
 
 if __name__ == "__main__":
     with sync_playwright() as playwright:
-        link = get_processed_
+        # Yahan par 'get_processed_' ko fix karke 'get_processed_image' kar diya hai
+        link = get_processed_image()
+        if link:
+            post_to_forum(playwright, link)
+        else:
+            print("Could not get or process image.")
